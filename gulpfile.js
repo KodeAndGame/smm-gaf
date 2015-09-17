@@ -1,6 +1,6 @@
 var gulp = require('gulp'),
-	babel = require('gulp-babel'),
-	nodemon = require("gulp-nodemon");
+  babel = require('gulp-babel'),
+  nodemon = require("gulp-nodemon");
 
 gulp.task('build', function () {
   return gulp.src("src/app.js")
