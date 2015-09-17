@@ -4,6 +4,7 @@
   "description": "Aggregator for Mario Maker levels posted in NeoGAF",
   "main": "app.js",
   "dependencies": {
+    "lokijs": "^1.3.10",
     "x-ray": "^2.0.2"
   },
   "devDependencies": {
