@@ -3,7 +3,9 @@
   "version": "1.0.0",
   "description": "Aggregator for Mario Maker levels posted in NeoGAF",
   "main": "app.js",
-  "dependencies": {},
+  "dependencies": {
+    "x-ray": "^2.0.2"
+  },
   "devDependencies": {
     "gulp": "^3.9.0",
     "gulp-babel": "^5.2.1",
