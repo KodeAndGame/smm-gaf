@@ -4,7 +4,9 @@
   "description": "Aggregator for Mario Maker levels posted in NeoGAF",
   "main": "app.js",
   "dependencies": {
+    "chunking-streams": "0.0.8",
     "lokijs": "^1.3.10",
+    "sentiment": "^1.0.2",
     "x-ray": "^2.0.2"
   },
   "devDependencies": {

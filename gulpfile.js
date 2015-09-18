@@ -3,7 +3,7 @@ var gulp = require('gulp'),
   nodemon = require("gulp-nodemon");
 
 gulp.task('build', function () {
-  return gulp.src("src/app.js")
+  return gulp.src("src/**/**.js")
     .pipe(babel({stage : 0}))
     .pipe(gulp.dest("dist"));
 });
