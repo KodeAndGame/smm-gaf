@@ -1,3 +1,1 @@
-let Xray = require('x-ray'),
-	xray = Xray();
-
+let db = require('./lib/db.js')
