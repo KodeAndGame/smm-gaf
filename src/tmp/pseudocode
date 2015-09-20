@@ -1,0 +1,51 @@
+Reference
+	levelCode
+	isAuthor (poster == author)
+	content
+	sentiment
+	sentimentConfidence
+	postNumber
+
+Level
+	levelCode
+	author
+
+LevelScore
+	levelCode
+	firstPostNumber
+	latestPostNumber
+	freshnessScore //based of firstPost and latestPost
+	repostCount
+	mentionCount
+
+
+let levels = [], references = [];
+levelPosts.forEach(levelPost => {)
+	//TODO: find codes
+
+	codes.forEach(code => {)
+		let reference;
+		reference.postNumber = levelPost.postNumber;
+		reference.levelCode = code;
+		reference.isAuthor = false;
+
+		if (!levels.Contains(levelCode)) {
+			levels.push({
+				levelCode: levelCode
+				author: levelPost.poster
+			})
+			reference.isAuthor = true;
+		}
+		else {
+			
+		}
+
+		//TODO: extract content
+		if(levelCode is inside quote) {
+
+		}
+
+		//TODO: determine sentiment based on content
+		if
+	}		
+}

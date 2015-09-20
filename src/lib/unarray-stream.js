@@ -14,16 +14,16 @@ Unarray.prototype._transform = function (data, enc, cb) {
 
 	let isEnd = false;
 	if(!data) return;
-	let objs = data.toString().split(/}[\r\n]?,?[\r\n]/)
+	let objs = data.toString().split(/}[\r\n]?,?[\r\n]/);
 	objs.forEach(obj => {
 		if(obj.startsWith('[') || obj.endsWith(']') || obj.startsWith(',')) {
 			return;
 		}
 
-		obj += '}'
+		obj += '}';
 
-		this.push(obj);
-	})
+		this.push(JSON.parse(obj));
+	});
 	
 	cb();
 }
