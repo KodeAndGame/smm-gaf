@@ -1,8 +1,8 @@
 const postsPerPage = 50;
 let Xray = require('x-ray'),
-  filter = require('stream-filter'),
-  transform = require('stream-transform'),
+  through = require('through'),
   unarray = require('./unarray-stream'),
+  moment = require('moment'),
   xray = Xray();
 
 let exports = module.exports = {};
@@ -10,22 +10,43 @@ let exports = module.exports = {};
 exports.createStream = function (options) {
   options = initOptions(options);
 
-  let ret = xray(`http://www.neogaf.com/forum/showthread.php?t=${options.threadId}`, 'div[id^=edit]', [{
+  let ret = xray(`http://www.neogaf.com/forum/showthread.php?t=${options.threadId}&page=${options.startPage}`, 'div[id^=edit]', [{
         postNumber: '.post-meta .right strong',
         poster: '.postbit-details-username a',
         subject: '.post-meta-border strong', 
+        time: '.postbit-details-usertitle + .smallfont',
         body: '.post'
       }]);
 
   if(options.startPage != options.endPage) ret = ret.paginate('a[rel="next"]@href');
   if(options.endPage > 0) ret = ret.limit(options.endPage - options.startPage);
 
+
   return ret.write()
-      .pipe(unarray)      
-      .pipe(filter(function (data) {
-        let n = parseInt(data.postNumber, 10);
-        return n >= options.startPost && (n <= options.endPost || options.endPost < 0);
-      }));
+      .pipe(unarray);
+      .pipe(through(function(data) {
+        data.postNumber = parseInt(data.postNumber, 10);
+        if(data.postNumber < options.startPost || (data.postNumber > options.endPost && options.endPost > 0)) {
+          return;
+        }
+
+        let found = data.time.match(/\([\w\d/]*,[\s\d:\w]*\)/g);
+        if(found) {
+          //TODO: optmize?
+          data.time = found[0]
+            .replace('(', '')
+            .replace(')', '')
+            .replace('Today', moment.utc().format('MM/DD/YYYY'))
+            .replace('Yesterday', moment.utc().subtract(1, 'days').format('MM/DD/YYYY'));
+
+          data.time = moment.utc(data.time, 'MM/DD/YYYY, h:mm A')
+        }
+        else {
+          data.time = null;
+        }
+
+        this.emit('data', data);        
+      }))
 
 }
 

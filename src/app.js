@@ -1,17 +1,19 @@
 var gaf = require('./lib/gaf-scraper.js');
 
+//TODO: error?
 gaf.createStream({
 	threadId: 1109852,
-	startPost: 3,
 	endPost: 5
 })
 .on('data', function(obj) {
-	console.log(obj);
+	console.log(obj.postNumber);
 })
 .on('end', function() {
 	console.log('done');
 })
-console.log('huh');
+.on('error', function(err) {
+	console.error(err);
+})
 /*
 
 let db = require('./lib/db.js');
