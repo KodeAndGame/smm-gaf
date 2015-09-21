@@ -7,7 +7,7 @@ let loadDb = function() {
 	db = new loki(dbFile, {
 		autoload: true,
 		autosave: true, 
-		autosaveInterval: 10000,
+		autosaveInterval: 10000
 	})
 }()
 
@@ -25,6 +25,25 @@ function buildPostCollection() {
 	})
 	.on('error', function (err) {
 		console.error(err);
+	});
+}
+
+function buildLevelsCollection() {
+	posts = db.getCollection('posts');
+	levels = db.addCollection('levels');
+	levels.ensureUniqueIndex('code');
+	posts.forEach(post => {
+		let matches = post.body.match(/\w{4}-\w{4}-\w{4}-\w{4}/g);
+		matches.forEach(match => {
+			let level = byCode(match);
+			if(!level) {
+				levels.insert({
+					code: match,
+					author: post.poster,
+					firstAppearcance: null
+				});
+			}
+		});
 	});
 }
 

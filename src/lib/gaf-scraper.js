@@ -10,14 +10,17 @@ let exports = module.exports = {};
 exports.createStream = function (options) {
   options = initOptions(options);
 
-  let ret = xray(`http://www.neogaf.com/forum/showthread.php?t=${options.threadId}&page=${options.startPage}`, 'div[id^=edit]', [{
-        postNumber: '.post-meta .right strong',
-        poster: '.postbit-details-username a',
-        subject: '.post-meta-border strong', 
-        time: '.postbit-details-usertitle + .smallfont',
-        isMod: '.postbit-details-username a span@style',
-        body: '.post@html'
-      }]);
+  let ret = xray(
+    `http://www.neogaf.com/forum/showthread.php?t=${options.threadId}&page=${options.startPage}`, 
+    'div[id^=edit]', 
+    [{
+      postNumber: '.post-meta .right strong',
+      poster: '.postbit-details-username a',
+      subject: '.post-meta-border strong', 
+      time: '.postbit-details-usertitle + .smallfont',
+      isMod: '.postbit-details-username a span@style',
+      body: '.post@html'
+    }]);
 
   if(options.startPage != options.endPage) ret = ret.paginate('a[rel="next"]@href');
   if(options.endPage > 0) ret = ret.limit(options.endPage - options.startPage + 1);
