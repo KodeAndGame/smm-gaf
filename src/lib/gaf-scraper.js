@@ -32,6 +32,12 @@ exports.createStream = function (options) {
             return;
           }
 
+          if(options.match) {
+            if(!data.body.match(options.match)) {
+              return;
+            }
+          }
+
           //reset to an actual bool as opposed to truthiness
           data.isMod = data.isMod ? true : false; 
 
