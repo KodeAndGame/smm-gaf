@@ -1,7 +1,10 @@
-let loki = require('lokijs'),
-	gaf = require('./lib/gaf-scraper.js'),
+let fs = require('fs'),
+	loki = require('lokijs'),
+	gaf = require('./gaf-scraper.js'),
 	dbFile = __dirname + '/../../data/smm-gaf-db.json',
 	db	
+
+module.exports = exports = {};
 
 let loadDb = function() {
 	db = new loki(dbFile, {
@@ -9,42 +12,93 @@ let loadDb = function() {
 		autosave: true, 
 		autosaveInterval: 10000
 	})
+	exports.loki = db
 }()
 
-function buildPostCollection() {
-	posts = db.addCollection('posts');
+exports.rebuild = function(cb) {
+	buildPostCollection(cb);
+}
+
+function buildPostCollection(cb) {
+	let posts = db.addCollection('posts');
+	let notificationLimit = 100;
+	let nextNotification = notificationLimit;
+	let count = 0;
+
 	gaf.createStream({
 		threadId: 1109852,
 		match: /\w{4}-\w{4}-\w{4}-\w{4}/
 	})
 	.on('data', function(obj) {
 		posts.insert(obj);
+
+		count++; 
+		if(obj.postNumber > nextNotification) {
+			console.log(`${nextNotification} records processed. ${count} records saved.`);
+			nextNotification += notificationLimit;
+			db.saveDatabase();
+		}
 	})
 	.on('end', function() {
 		db.saveDatabase();
+		cb();
 	})
 	.on('error', function (err) {
 		console.error(err);
 	});
 }
 
-function buildLevelsCollection() {
-	posts = db.getCollection('posts');
-	levels = db.addCollection('levels');
+function buildAdditionalCollections() {
+	let posts = db.getCollection('posts');
+	
+	let levels = db.addCollection('levels');
 	levels.ensureUniqueIndex('code');
-	posts.forEach(post => {
-		let matches = post.body.match(/\w{4}-\w{4}-\w{4}-\w{4}/g);
-		matches.forEach(match => {
-			let level = byCode(match);
-			if(!level) {
-				levels.insert({
-					code: match,
-					author: post.poster,
-					firstAppearcance: null
-				});
-			}
-		});
-	});
+
+	let users = db.addCollection('users');
+	users.ensureUniqueIndex('name');
+
+	let mentions = db.addCollection('mentions');
 }
 
-module.exports.loki = db
+
+
+/*
+	post {
+		postNumber
+		poster
+    subject
+    time
+    isMod
+    body
+    //TODO: url
+    //TODO: self promotional only?
+	}
+
+	postBody {
+		[{
+			paragraphOrQuote
+			containsCode
+			text
+		}]
+	}
+
+	user {
+		name
+		isMod
+		reputation
+	}
+
+	level {
+		code
+		author
+		firstPost
+	}
+
+	mention {
+		level
+		text
+		poster
+		creator
+		sentiment (only if poster != creator)
+	}
+*/

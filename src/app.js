@@ -1,18 +1,29 @@
-var gaf = require('./lib/gaf-scraper.js');
+let db = require('./lib/db');
 
-//TODO: error?
+console.log('app started');
+db.loki.on('loaded', function() {
+	console.log('database loaded');
+  db.rebuild(function() {
+    console.log('database rebuilt');
+  })
+});
+
+/*
+let gaf = require('./lib/gaf-scraper.js'),
+	keyIn = require('readline-sync').keyIn;
+
+let posts = {};
+let levels = {};
+
 gaf.createStream({
 	threadId: 1109852,
 	match: /\w{4}-\w{4}-\w{4}-\w{4}/g,
-	startPost: 1000,
-	endPost: 1100
+	endPost: 100
 })
 .on('data', function(obj) {
 	console.log(obj.postNumber);
 })
-.on('end', function() {
-	console.log('done');
-})
 .on('error', function(err) {
 	console.error(err);
 })
+*/

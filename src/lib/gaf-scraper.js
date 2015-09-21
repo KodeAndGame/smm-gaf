@@ -15,6 +15,7 @@ exports.createStream = function (options) {
     'div[id^=edit]', 
     [{
       postNumber: '.post-meta .right strong',
+      url: '.post-meta .right a@href',
       poster: '.postbit-details-username a',
       subject: '.post-meta-border strong', 
       time: '.postbit-details-usertitle + .smallfont',
@@ -22,6 +23,7 @@ exports.createStream = function (options) {
       body: '.post@html'
     }]);
 
+  debugger;
   if(options.startPage != options.endPage) ret = ret.paginate('a[rel="next"]@href');
   if(options.endPage > 0) ret = ret.limit(options.endPage - options.startPage + 1);
 
@@ -41,21 +43,24 @@ exports.createStream = function (options) {
             }
           }
 
+          data.body = data.body
+            .replace(/[\r\n\t]/g, '')
+
           //reset to an actual bool as opposed to truthiness
           data.isMod = data.isMod ? true : false; 
 
           //reset date/time to a moment
-          let found = data.time.match(/\([\w\d/]*,[\s\d:\w]*\)/g);
+          let found = data.time.match(/\([\w\d-]*,[\s\d:\w]*\)/g);
           if(found) {
             data.time = found[0]
               .replace('(', '')
               .replace(')', '')
-              .replace('Today', moment.utc().format('MM/DD/YYYY'))
-              .replace('Yesterday', moment.utc().subtract(1, 'days').format('MM/DD/YYYY'));
-            data.time = moment.utc(data.time, 'MM/DD/YYYY, h:mm A')
+              .replace('Today', moment.utc().format('MM-DD-YYYY'))
+              .replace('Yesterday', moment.utc().subtract(1, 'days').format('MM-DD-YYYY'));
+            data.time = moment.utc(data.time, 'MM/DD/YYYY, h:mm P')
           }
           else {
-            data.time = null;
+            this.emit('error', `unable to parse the date-time: ${data.time}`);
           }
 
           this.emit('data', data); 
