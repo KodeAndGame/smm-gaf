@@ -30,6 +30,13 @@ function buildPostCollection(cb) {
 		match: /\w{4}-\w{4}-\w{4}-\w{4}/
 	})
 	.on('data', function(obj) {
+		if(post.poster == 'daydream' && post.body.indexOf('http://i.imgur.com/kAlmwzR.png') > 0) {
+			post.isCommunityShowcase = true;
+		}
+
+		let matches = post.body.match(/\w{4}-\w{4}-\w{4}-\w{4}/g);
+    post.levelsMentioned = matches;
+
 		posts.insert(obj);
 
 		count++; 
@@ -48,30 +55,107 @@ function buildPostCollection(cb) {
 	});
 }
 
-function buildAdditionalCollections() {
+exports.buildLevelsCollection = function() {
+	//TODO -- add starting post for refresh
 	let posts = db.getCollection('posts');
-	
-	let levels = db.addCollection('levels');
-	levels.ensureUniqueIndex('code');
 
-	let users = db.addCollection('users');
-	users.ensureUniqueIndex('name');
+	let levels = db.getCollection('levels');
+  
+  let byTimeView = posts.addDynamicView('byTime');
+  let results = byTimeView
+  	.applyFind({isCommunityShowcase: {'$ne': true}})
+  	.applySimpleSort('time')
+  	.data();
 
-	let mentions = db.addCollection('mentions');
+  if(!results) {
+  	console.log('no applicable posts found');
+  	return;
+  }
+  console.log(`${results.length} applicable posts found`);
+
+  results.forEach(post => {
+    let matches = post.body.match(/\w{4}-\w{4}-\w{4}-\w{4}/g);
+    matches.forEach(match => {
+      if(!levels.by('code', match)) {
+        levels.insert({
+          code: match,
+          author: post.poster,
+          firstPost: post.postNumber
+        })
+      };
+    });
+  });
+
+  db.saveDatabase();
+  console.log('done building levels collection');
+
+  console.log(`${levels.data.length} levels created`);
 }
+
+exports.buildCommunityShowcaseColumn = function() {
+	let posts = db.getCollection('posts');
+	let results = posts.find({'$and' : [
+		{body: {'$contains': 'http://i.imgur.com/kAlmwzR.png'}},
+		{poster: 'daydream'}
+	]});
+
+	if(!results) return;
+	console.log(`${results.length} community showcase posts found`);
+	results.forEach(post => {
+		post.isCommunityShowcase = true;
+		posts.update(post);
+	})
+	
+	db.saveDatabase();
+	console.log('completed building isCommunityShowcase column');
+
+}
+
+exports.buildLevelsMentionedColumn = function() {
+  let posts = db.getCollection('posts');
+
+  posts.data.forEach(post => {
+    let matches = post.body.match(/\w{4}-\w{4}-\w{4}-\w{4}/g);
+    post.levelsMentioned = matches;
+    posts.update(post);
+  })
+
+  db.saveDatabase();
+  console.log('completed building levelsMentioned column');
+}
+
+exports.buildMentionsOtherColumn = function() {
+  let posts = db.getCollection('posts'),
+    levels = db.getCollection('levels');
+
+  posts.data.forEach(post => {
+    post.levelsMentioned.forEach(levelMentioned => {
+      let level = levels.by('code', levelMentioned);
+      if(level.author != post.poster) {
+        post.mentionsOther = true;
+      }
+    });
+  });
+  db.saveDatabase();
+  console.log('completed building mentionsOther column');
+}
+
 
 
 
 /*
 	post {
 		postNumber
+		url
 		poster
     subject
     time
     isMod
     body
-    //TODO: url
-    //TODO: self promotional only?
+
+    levelsMentioned
+  	isCommunityShowcase
+  	mentionsOther
 	}
 
 	postBody {
@@ -96,9 +180,10 @@ function buildAdditionalCollections() {
 
 	mention {
 		level
-		text
 		poster
 		creator
+
+		text  (only if poster != creator)
 		sentiment (only if poster != creator)
 	}
 */
