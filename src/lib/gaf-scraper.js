@@ -15,37 +15,45 @@ exports.createStream = function (options) {
         poster: '.postbit-details-username a',
         subject: '.post-meta-border strong', 
         time: '.postbit-details-usertitle + .smallfont',
-        body: '.post'
+        isMod: '.postbit-details-username a span@style',
+        body: '.post@html'
       }]);
 
   if(options.startPage != options.endPage) ret = ret.paginate('a[rel="next"]@href');
-  if(options.endPage > 0) ret = ret.limit(options.endPage - options.startPage);
+  if(options.endPage > 0) ret = ret.limit(options.endPage - options.startPage + 1);
 
 
   return ret.write()
-      .pipe(unarray);
+      .pipe(unarray)
       .pipe(through(function(data) {
-        data.postNumber = parseInt(data.postNumber, 10);
-        if(data.postNumber < options.startPost || (data.postNumber > options.endPost && options.endPost > 0)) {
-          return;
-        }
+        try {
+          data.postNumber = parseInt(data.postNumber, 10);
+          if(data.postNumber < options.startPost || (data.postNumber > options.endPost && options.endPost > 0)) {
+            return;
+          }
 
-        let found = data.time.match(/\([\w\d/]*,[\s\d:\w]*\)/g);
-        if(found) {
-          //TODO: optmize?
-          data.time = found[0]
-            .replace('(', '')
-            .replace(')', '')
-            .replace('Today', moment.utc().format('MM/DD/YYYY'))
-            .replace('Yesterday', moment.utc().subtract(1, 'days').format('MM/DD/YYYY'));
+          //reset to an actual bool as opposed to truthiness
+          data.isMod = data.isMod ? true : false; 
 
-          data.time = moment.utc(data.time, 'MM/DD/YYYY, h:mm A')
-        }
-        else {
-          data.time = null;
-        }
+          //reset date/time to a moment
+          let found = data.time.match(/\([\w\d/]*,[\s\d:\w]*\)/g);
+          if(found) {
+            data.time = found[0]
+              .replace('(', '')
+              .replace(')', '')
+              .replace('Today', moment.utc().format('MM/DD/YYYY'))
+              .replace('Yesterday', moment.utc().subtract(1, 'days').format('MM/DD/YYYY'));
+            data.time = moment.utc(data.time, 'MM/DD/YYYY, h:mm A')
+          }
+          else {
+            data.time = null;
+          }
 
-        this.emit('data', data);        
+          this.emit('data', data); 
+        }
+        catch(e) {
+          this.emit('error', e);
+        }
       }))
 
 }
@@ -91,27 +99,4 @@ let initOptions = function (options) {
     : postToPage(options.endPost);
 
   return options;
-}
-
-let testOptions = function (options) {
-  console.log(initOptions(options));
-}
-
-let testOptionsRun = function () {
-  testOptions({
-    threadId: 1109852,
-    startPost: 0
-  });
-  testOptions({
-    threadId: 1109852,
-    startPost: 600
-  });
-  testOptions({
-    threadId: 1109852,
-    startPost: 601
-  });
-  testOptions({
-    threadId: 1109852,
-    endPost: 601
-  });
 }

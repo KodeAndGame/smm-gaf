@@ -12,15 +12,21 @@ Unarray.prototype._transform = function (data, enc, cb) {
 	// TODO: Error handling
 	// http://stackoverflow.com/questions/21771220/error-handling-with-node-js-streams
 
-	//TODO: first post is laways being filtered out. need to find out why.
 	let isEnd = false;
 	if(!data) return;
 	let objs = data.toString().split(/}[\r\n]?,?[\r\n]/);
 	objs.forEach(obj => {
-		if(obj.startsWith('[') || obj.endsWith(']') || obj.startsWith(',')) {
-			return;
-		}
 
+		//replace array-specific stuff
+		obj = obj
+			.replace(/^\[/, '')
+			.replace(/^,/, '')
+			.replace(/\]$/, '');
+
+		//check for non whitespace
+		if(!obj.match(/\S/)) return;
+
+		//add back the curly brace removed from the split
 		obj += '}';
 
 		this.push(JSON.parse(obj));
