@@ -1,6 +1,11 @@
 var gulp = require('gulp'),
   babel = require('gulp-babel'),
+  del = require('del'),
   nodemon = require("gulp-nodemon");
+
+gulp.task('clean', function () {
+  return del(['dist/**']);
+});
 
 gulp.task('build', function () {
   return gulp.src("src/**/**.js")
@@ -8,7 +13,7 @@ gulp.task('build', function () {
     .pipe(gulp.dest("dist"));
 });
 
-gulp.task('start', function () {
+gulp.task('start', ['build'], function () {
   nodemon({
     script: 'dist/app.js',
     tasks: ['build'],
