@@ -1,4 +1,5 @@
 const postsPerPage = 50;
+
 let Xray = require('x-ray'),
   through = require('through'),
   unarray = require('./unarray-stream'),
@@ -23,7 +24,6 @@ exports.createStream = function (options) {
       body: '.post@html'
     }]);
 
-  debugger;
   if(options.startPage != options.endPage) ret = ret.paginate('a[rel="next"]@href');
   if(options.endPage > 0) ret = ret.limit(options.endPage - options.startPage + 1);
 
