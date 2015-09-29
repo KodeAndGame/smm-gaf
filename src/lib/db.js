@@ -2,7 +2,9 @@ let fs = require('fs'),
 	loki = require('lokijs'),
 	gaf = require('./gaf-scraper.js'),
 	dbFile = __dirname + '/../../data/smm-gaf-db.json',
-	db	
+	db,
+  smmGafOtIds = [1109852],
+  smmGafMiscIds = [1115465]
 
 module.exports = exports = {};
 
@@ -27,7 +29,6 @@ function buildPostCollection(cb) {
 
 	gaf.createStream({
 		threadId: 1109852,
-		match: /\w{4}-\w{4}-\w{4}-\w{4}/
 	})
 	.on('data', function(obj) {
 		if(post.poster == 'daydream' && post.body.indexOf('http://i.imgur.com/kAlmwzR.png') > 0) {

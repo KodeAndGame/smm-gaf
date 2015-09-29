@@ -3,6 +3,7 @@ const postsPerPage = 50;
 let Xray = require('x-ray'),
   through = require('through'),
   url = require('url'),
+  debug = require('debug')('smm-gaf-scraper'),
   unarray = require('./unarray-stream'),
   moment = require('moment'),
   xray = Xray();
@@ -33,7 +34,7 @@ exports.createStream = function (options) {
 
   return ret.write()
       .on('error', function(err) {
-        console.error(err);
+        debug(err);
       })
       .pipe(unarray)
       .pipe(through(function(data) {
