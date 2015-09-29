@@ -2,6 +2,7 @@ const postsPerPage = 50;
 
 let Xray = require('x-ray'),
   through = require('through'),
+  url = require('url'),
   unarray = require('./unarray-stream'),
   moment = require('moment'),
   xray = Xray();
@@ -15,60 +16,65 @@ exports.createStream = function (options) {
     `http://www.neogaf.com/forum/showthread.php?t=${options.threadId}&page=${options.startPage}`, 
     'div[id^=edit]', 
     [{
-      postNumber: '.post-meta .right strong',
+      postCount: '.post-meta .right strong',
       url: '.post-meta .right a@href',
       poster: '.postbit-details-username a',
       subject: '.post-meta-border strong', 
       time: '.postbit-details-usertitle + .smallfont',
+      altTime: '.postbit-details-username + .smallfont',
       isMod: '.postbit-details-username a span@style',
       body: '.post@html'
     }]);
 
-  if(options.startPage != options.endPage) ret = ret.paginate('a[rel="next"]@href');
-  if(options.endPage > 0) ret = ret.limit(options.endPage - options.startPage + 1);
+  //if (options.delay) ret.delay(delay);
+  if (options.startPage != options.endPage) ret = ret.paginate('a[rel="next"]@href');
+  if (options.endPage > 0) ret = ret.limit(options.endPage - options.startPage + 1);
 
 
   return ret.write()
+      .on('error', function(err) {
+        console.error(err);
+      })
       .pipe(unarray)
       .pipe(through(function(data) {
-        try {
-          data.postNumber = parseInt(data.postNumber, 10);
-          if(data.postNumber < options.startPost || (data.postNumber > options.endPost && options.endPost > 0)) {
+        data.threadId = options.threadId;
+        data.postId = url.parse(data.url, true).query.p
+        data.id = `${data.threadId}|${data.postCount}`;
+        data.postNumber = parseInt(data.postNumber, 10);
+        if(data.postNumber < options.startPost || (data.postNumber > options.endPost && options.endPost > 0)) {
+          return;
+        }
+
+        if(options.match) {
+          if(!data.body.match(options.match)) {
             return;
           }
-
-          if(options.match) {
-            if(!data.body.match(options.match)) {
-              return;
-            }
-          }
-
-          data.body = data.body
-            .replace(/[\r\n\t]/g, '')
-
-          //reset to an actual bool as opposed to truthiness
-          data.isMod = data.isMod ? true : false; 
-
-          //reset date/time to a moment
-          let found = data.time.match(/\([\w\d-]*,[\s\d:\w]*\)/g);
-          if(found) {
-            data.time = found[0]
-              .replace('(', '')
-              .replace(')', '')
-              .replace('Today', moment.utc().format('MM-DD-YYYY'))
-              .replace('Yesterday', moment.utc().subtract(1, 'days').format('MM-DD-YYYY'));
-            data.time = moment.utc(data.time, 'MM/DD/YYYY, h:mm P')
-          }
-          else {
-            this.emit('error', `unable to parse the date-time: ${data.time}`);
-          }
-
-          this.emit('data', data); 
         }
-        catch(e) {
-          this.emit('error', e);
+
+        //remove excess whitespace
+        data.body = data.body
+          .replace(/[\r\n\t]/g, '')
+
+        //reset to an actual bool as opposed to truthiness
+        data.isMod = data.isMod ? true : false; 
+
+        //reset date/time to a moment
+        data.time = data.time || data.altTime;
+        let found = data.time.match(/\([\w\d-]*,[\s\d:\w]*\)/g);
+        if(found) {
+          data.time = found[0]
+            .replace('(', '')
+            .replace(')', '')
+            .replace('Today', moment.utc().format('MM-DD-YYYY'))
+            .replace('Yesterday', moment.utc().subtract(1, 'days').format('MM-DD-YYYY'));
+          data.time = moment.utc(data.time, 'MM/DD/YYYY, h:mm P')
         }
-      }))
+        else {
+          this.emit('error', `unable to parse the date-time: ${data.time}`);
+        }
+
+      this.emit('data', data); 
+    }));
 
 }
 

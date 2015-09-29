@@ -9,9 +9,6 @@ function Unarray() {
 }
 
 Unarray.prototype._transform = function (data, enc, cb) {
-	// TODO: Error handling
-	// http://stackoverflow.com/questions/21771220/error-handling-with-node-js-streams
-
 	let isEnd = false;
 	if(!data) return;
 	let objs = data.toString().split(/}[\r\n]?,?[\r\n]/);
