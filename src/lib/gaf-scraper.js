@@ -4,7 +4,7 @@ let Xray = require('x-ray'),
   through = require('through'),
   url = require('url'),
   debug = require('debug')('smm-gaf-scraper'),
-  unarray = require('./unarray-stream'),
+  Unarray = require('./unarray-stream'),
   moment = require('moment'),
   xray = Xray();
 
@@ -27,7 +27,7 @@ exports.createStream = function (options) {
       body: '.post@html'
     }]);
 
-  //if (options.delay) ret.delay(delay);
+  //if (options.delay) ret.delay(delay); (NOT TESTED)
   if (options.startPage != options.endPage) ret = ret.paginate('a[rel="next"]@href');
   if (options.endPage > 0) ret = ret.limit(options.endPage - options.startPage + 1);
 
@@ -36,13 +36,13 @@ exports.createStream = function (options) {
       .on('error', function(err) {
         debug(err);
       })
-      .pipe(unarray)
+      .pipe(new Unarray())
       .pipe(through(function(data) {
         data.threadId = options.threadId;
         data.postId = url.parse(data.url, true).query.p
-        data.id = `${data.threadId}|${data.postCount}`;
-        data.postNumber = parseInt(data.postNumber, 10);
-        if(data.postNumber < options.startPost || (data.postNumber > options.endPost && options.endPost > 0)) {
+        //data.id = `${data.threadId}|${data.postCount}`;
+        data.postCount = parseInt(data.postCount, 10);
+        if(data.postCount < options.startPost || (data.postCount > options.endPost && options.endPost > 0)) {
           return;
         }
 
@@ -57,7 +57,7 @@ exports.createStream = function (options) {
           .replace(/[\r\n\t]/g, '')
 
         //reset to an actual bool as opposed to truthiness
-        data.isMod = data.isMod ? true : false; 
+        data.isMod = !!data.isMod; 
 
         //reset date/time to a moment
         data.time = data.time || data.altTime;

@@ -1,8 +1,7 @@
-let gaf = require('./lib/gaf-scraper');
+let data = require('./lib/data'),
+  debug = require('debug')('smm-gaf-app')
 
-gaf.createStream({
-  threadId: 1004449,
-  endPost: 2
-}).on('data', function(post) {
-  console.log(post.postId + ' - ' + post.postCount + ' - ' + post.id);
+data.build(function() {
+  debug('closing database')
+  data.db.close();
 })

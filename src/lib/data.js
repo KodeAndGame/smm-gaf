@@ -1,23 +1,105 @@
 let fs = require('fs'),
 	loki = require('lokijs'),
+  Promise = require('bluebird'),
+  debug = require('debug')('smm-gaf-data'),
 	gaf = require('./gaf-scraper.js'),
-	dbFile = __dirname + '/../../data/smm-gaf-db.json',
-	db,
-  smmGafOtIds = [1109852],
-  smmGafMiscIds = [1115465]
+	dbpath = __dirname + '/../../data/smm-gaf-db.json',
+  threadConfigs = require('../../data/threads.json'),
+	db
 
-module.exports = exports = {};
+module.exports = Data()
 
-let loadDb = function() {
-	db = new loki(dbFile, {
-		autoload: true,
-		autosave: true, 
-		autosaveInterval: 10000
-	})
-	exports.loki = db
-}()
+function Data() {
+  if (!(this instanceof Data)) return new Data;
 
-exports.rebuild = function(cb) {
+  var self = this
+  this.db = null
+  this.posts = null
+  this.threads = null
+
+  this.load = function (cb){
+    debug('loading database')
+    this.db = new loki(dbpath, {
+      autoload: true,
+      autosave: true, 
+      autosaveInterval: 10000
+    })
+    if(cb) this.db.on('loaded', cb)
+  }
+
+  this.build = function(cb) {
+    debug('deleting existing database')
+    try {
+      fs.unlinkSync(dbpath)
+    }
+    catch (err) {
+      if(err.message.indexOf('ENOENT') < 0) {
+        cb(new Error('could not delete existing database'))
+      }
+    }
+    
+    debug('creating new database file')
+    fs.closeSync(fs.openSync(dbpath, 'w'))
+    
+    //load db
+    this.load(function() {
+      createThreadsCollection()
+      createPostsCollection()
+      self.refresh(cb)
+    })
+  }
+
+  this.refresh  = function(cb) {
+    let stale = self.threads.getDynamicView('stale').data();
+    Promise.map(stale, refreshThread)
+      .then(function() {
+        cb()
+      })    
+  }
+
+  let createThreadsCollection = function() {
+    debug('creating threads collection')
+    self.threads = self.db.addCollection('threads')
+    self.threads.ensureUniqueIndex('threadId')
+
+    threadConfigs.forEach(config => {
+      config.latestPost = 0;
+      self.threads.insert(config);
+    })
+
+    function staleFilter(thread) {
+      return !thread.finalPost || thread.latestPost < thread.finalPost;
+    }
+
+    let stale = self.threads.addDynamicView('stale')
+    stale.applyFind(staleFilter);
+  }
+
+  let createPostsCollection = function() {
+    debug('creating posts collection')
+    self.posts = self.db.addCollection('posts')
+    self.posts.ensureUniqueIndex('gafId')
+    self.posts.ensureUniqueIndex('id')
+  }
+
+  let refreshThread = function(thread) {
+    return new Promise(function (resolve, reject) {
+      debug('refreshing thread: %s', thread.threadId)
+      resolve()
+      
+      gaf.createStream({
+        threadId: thread.threadId,
+        startPost: thread.latestPost,
+        endPost: thread.finalPost
+      }).on('data', function(post) {
+        //do something with each post
+        //debug(`${post.threadId} | ${post.postCount}`)
+      }).on('end', resolve)
+    })    
+  }
+}
+
+let rebuild = function(cb) {
 	buildPostCollection(cb);
 }
 
@@ -56,7 +138,7 @@ function buildPostCollection(cb) {
 	});
 }
 
-exports.buildLevelsCollection = function() {
+let buildLevelsCollection = function() {
 	//TODO -- add starting post for refresh
 	let posts = db.getCollection('posts');
 
@@ -93,7 +175,7 @@ exports.buildLevelsCollection = function() {
   console.log(`${levels.data.length} levels created`);
 }
 
-exports.buildCommunityShowcaseColumn = function() {
+let buildCommunityShowcaseColumn = function() {
 	let posts = db.getCollection('posts');
 	let results = posts.find({'$and' : [
 		{body: {'$contains': 'http://i.imgur.com/kAlmwzR.png'}},
@@ -112,7 +194,7 @@ exports.buildCommunityShowcaseColumn = function() {
 
 }
 
-exports.buildLevelsMentionedColumn = function() {
+let buildLevelsMentionedColumn = function() {
   let posts = db.getCollection('posts');
 
   posts.data.forEach(post => {
@@ -125,7 +207,7 @@ exports.buildLevelsMentionedColumn = function() {
   console.log('completed building levelsMentioned column');
 }
 
-exports.buildMentionsOtherColumn = function() {
+let buildMentionsOtherColumn = function() {
   let posts = db.getCollection('posts'),
     levels = db.getCollection('levels');
 
@@ -142,9 +224,13 @@ exports.buildMentionsOtherColumn = function() {
 }
 
 
-
-
 /*
+  thread {
+    threadId
+    isOt
+    nothingToRefresh
+  }
+
 	post {
 		postNumber
 		url

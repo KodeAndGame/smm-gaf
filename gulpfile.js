@@ -1,10 +1,20 @@
 var gulp = require('gulp'),
   babel = require('gulp-babel'),
-  del = require('del'),
-  nodemon = require("gulp-nodemon");
+  nodemon = require('gulp-nodemon'),
+  env = require('gulp-env'),
+  shell = require('gulp-shell'),
+  del = require('del')
 
 gulp.task('clean', function () {
   return del(['dist/**']);
+});
+
+gulp.task('set-env', function() {
+  env({
+    vars: {
+      DEBUG: 'smm-gaf-*'
+    }
+  })
 });
 
 gulp.task('build', function () {
@@ -13,7 +23,7 @@ gulp.task('build', function () {
     .pipe(gulp.dest("dist"));
 });
 
-gulp.task('start', ['build'], function () {
+gulp.task('start', ['set-env', 'build'], function () {
   nodemon({
     script: 'dist/app.js',
     tasks: ['build'],
@@ -23,4 +33,9 @@ gulp.task('start', ['build'], function () {
   })
 })
 
-gulp.task('default', ['build', 'start']);
+gulp.task('dbg', ['set-env', 'build'], shell.task([
+  'node debug dist/app.js'
+]));
+
+
+gulp.task('default', ['start']);

@@ -32,4 +32,4 @@ Unarray.prototype._transform = function (data, enc, cb) {
 	cb();
 }
 
-module.exports = new Unarray();
+module.exports = Unarray;
