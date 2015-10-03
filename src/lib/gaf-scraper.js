@@ -39,7 +39,7 @@ exports.createStream = function (options) {
       .pipe(new Unarray())
       .pipe(through(function(data) {
         data.threadId = options.threadId;
-        data.postId = url.parse(data.url, true).query.p
+        data.postId = parseInt(url.parse(data.url, true).query.p, 10)
         //data.id = `${data.threadId}|${data.postCount}`;
         data.postCount = parseInt(data.postCount, 10);
         if(data.postCount < options.startPost || (data.postCount > options.endPost && options.endPost > 0)) {
@@ -61,6 +61,7 @@ exports.createStream = function (options) {
 
         //reset date/time to a moment
         data.time = data.time || data.altTime;
+        delete data['altTime']
         let found = data.time.match(/\([\w\d-]*,[\s\d:\w]*\)/g);
         if(found) {
           data.time = found[0]

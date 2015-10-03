@@ -9,7 +9,7 @@ gulp.task('clean', function () {
   return del(['dist/**']);
 });
 
-gulp.task('set-env', function() {
+gulp.task('enable-log', function() {
   env({
     vars: {
       DEBUG: 'smm-gaf-*'
@@ -23,7 +23,7 @@ gulp.task('build', function () {
     .pipe(gulp.dest("dist"));
 });
 
-gulp.task('start', ['set-env', 'build'], function () {
+gulp.task('start', ['enable-log', 'build'], function () {
   nodemon({
     script: 'dist/app.js',
     tasks: ['build'],
@@ -33,9 +33,12 @@ gulp.task('start', ['set-env', 'build'], function () {
   })
 })
 
-gulp.task('dbg', ['set-env', 'build'], shell.task([
+gulp.task('dbg', ['enable-log', 'build'], shell.task([
   'node debug dist/app.js'
 ]));
 
 
 gulp.task('default', ['start']);
+
+//TODO: db-build, db-refresh, db-schema-update?
+//TODO: consider replacing gulp-shell: https://gist.github.com/webdesserts/5632955, 

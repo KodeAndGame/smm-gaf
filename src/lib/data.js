@@ -7,270 +7,184 @@ let fs = require('fs'),
   threadConfigs = require('../../data/threads.json'),
 	db
 
-module.exports = Data()
+module.exports = new Data()
 
 function Data() {
   if (!(this instanceof Data)) return new Data;
 
-  var self = this
+  let self = this
   this.db = null
   this.posts = null
   this.threads = null
 
-  this.load = function (cb){
-    debug('loading database')
-    this.db = new loki(dbpath, {
-      autoload: true,
-      autosave: true, 
-      autosaveInterval: 10000
-    })
-    if(cb) this.db.on('loaded', cb)
-  }
-
-  this.build = function(cb) {
-    debug('deleting existing database')
-    try {
-      fs.unlinkSync(dbpath)
-    }
-    catch (err) {
-      if(err.message.indexOf('ENOENT') < 0) {
-        cb(new Error('could not delete existing database'))
+  this.load = function () {
+    return new Promise(function (resolve, reject) {
+      debug('loading database')
+      if (self.db) {
+        resolve()
+        return
       }
-    }
-    
-    debug('creating new database file')
-    fs.closeSync(fs.openSync(dbpath, 'w'))
-    
-    //load db
-    this.load(function() {
-      createThreadsCollection()
-      createPostsCollection()
-      self.refresh(cb)
+
+      self.db = new loki(dbpath, {
+        autoload: true,
+        autosave: true, 
+        autoloadCallback: function() {
+          self.threads = self.db.getCollection('threads')
+          self.posts = self.db.getCollection('posts')
+          resolve()
+        },
+        autosaveInterval: 10000
+      })
     })
   }
 
-  this.refresh  = function(cb) {
-    let stale = self.threads.getDynamicView('stale').data();
-    Promise.map(stale, refreshThread)
-      .then(function() {
-        cb()
-      })    
+  this.build = function() {
+    return new Promise(function (resolve, reject) {
+      debug('deleting existing database')
+      try {
+        fs.unlinkSync(dbpath)
+      }
+      catch (err) {
+        if(err.message.indexOf('ENOENT') < 0) {
+          cb(new Error('could not delete existing database'))
+        }
+      }
+      
+      debug('creating new database file')
+      fs.closeSync(fs.openSync(dbpath, 'w'))
+      
+      //load db
+      debug('loading database')
+      self.db = new loki(dbpath, {
+        autoload: true,
+        autosave: true, 
+        autosaveInterval: 10000,
+        autoloadCallback: function() {
+          createThreadsCollection()
+          createPostsCollection()
+          self.db.saveDatabase()
+          resolve()
+        }
+      })
+    })    
+  }
+
+  this.refresh  = function() {
+    //refresh thread configs
+    debug('refreshing thread metadata')
+    threadConfigs.forEach(config => {
+      debugger
+      let thread = self.threads.by('threadId', config.threadId)
+      thread = thread || config
+      if(!thread.latestPost) thread.latestPost = 0
+      thread.finalPost = thread.finalPost < config.finalPost ? config.finalPost : thread.finalPost
+
+      //upsert
+      if(thread.$loki) {
+        self.threads.update(thread)
+      }
+      else {
+        self.threads.insert(thread)
+      }
+    })
+
+    debug('refreshing stale threads')
+    debugger
+    let stale = self.threads.where(staleFilter)
+    return Promise.map(stale, refreshThread)
+  }
+
+  this.reschema = function() {
+    return new Promise(function (resolve, reject) {
+      debug('re-applying schema to %s posts', self.posts.data.length)
+      let count = 0
+      let notificationLimit = 50
+
+      self.posts.data.forEach(post => {
+        post = applySchema(post)
+        self.posts.update(post)
+        if(++count % notificationLimit == 0) {
+          debug('%s posts reset', count)
+          debug('saving database')
+          self.db.saveDatabase()
+        }
+      })
+      resolve()
+    })
   }
 
   let createThreadsCollection = function() {
     debug('creating threads collection')
     self.threads = self.db.addCollection('threads')
     self.threads.ensureUniqueIndex('threadId')
-
-    threadConfigs.forEach(config => {
-      config.latestPost = 0;
-      self.threads.insert(config);
-    })
-
-    function staleFilter(thread) {
-      return !thread.finalPost || thread.latestPost < thread.finalPost;
-    }
-
-    let stale = self.threads.addDynamicView('stale')
-    stale.applyFind(staleFilter);
   }
 
   let createPostsCollection = function() {
     debug('creating posts collection')
     self.posts = self.db.addCollection('posts')
-    self.posts.ensureUniqueIndex('gafId')
-    self.posts.ensureUniqueIndex('id')
+    self.posts.ensureUniqueIndex('postId')
+    self.posts.ensureUniqueIndex('friendlyId')
   }
 
   let refreshThread = function(thread) {
     return new Promise(function (resolve, reject) {
       debug('refreshing thread: %s', thread.threadId)
-      resolve()
-      
+      let count = 0
+      let notificationLimit = 50
       gaf.createStream({
         threadId: thread.threadId,
-        startPost: thread.latestPost,
+        startPost: thread.latestPost + 1,
         endPost: thread.finalPost
       }).on('data', function(post) {
-        //do something with each post
-        //debug(`${post.threadId} | ${post.postCount}`)
-      }).on('end', resolve)
-    })    
-  }
-}
+        post = applySchema(post)
+        post = insertPost(post)
 
-let rebuild = function(cb) {
-	buildPostCollection(cb);
-}
-
-function buildPostCollection(cb) {
-	let posts = db.addCollection('posts');
-	let notificationLimit = 100;
-	let nextNotification = notificationLimit;
-	let count = 0;
-
-	gaf.createStream({
-		threadId: 1109852,
-	})
-	.on('data', function(obj) {
-		if(post.poster == 'daydream' && post.body.indexOf('http://i.imgur.com/kAlmwzR.png') > 0) {
-			post.isCommunityShowcase = true;
-		}
-
-		let matches = post.body.match(/\w{4}-\w{4}-\w{4}-\w{4}/g);
-    post.levelsMentioned = matches;
-
-		posts.insert(obj);
-
-		count++; 
-		if(obj.postNumber > nextNotification) {
-			console.log(`${nextNotification} records processed. ${count} records saved.`);
-			nextNotification += notificationLimit;
-			db.saveDatabase();
-		}
-	})
-	.on('end', function() {
-		db.saveDatabase();
-		cb();
-	})
-	.on('error', function (err) {
-		console.error(err);
-	});
-}
-
-let buildLevelsCollection = function() {
-	//TODO -- add starting post for refresh
-	let posts = db.getCollection('posts');
-
-	let levels = db.getCollection('levels');
-  
-  let byTimeView = posts.addDynamicView('byTime');
-  let results = byTimeView
-  	.applyFind({isCommunityShowcase: {'$ne': true}})
-  	.applySimpleSort('time')
-  	.data();
-
-  if(!results) {
-  	console.log('no applicable posts found');
-  	return;
-  }
-  console.log(`${results.length} applicable posts found`);
-
-  results.forEach(post => {
-    let matches = post.body.match(/\w{4}-\w{4}-\w{4}-\w{4}/g);
-    matches.forEach(match => {
-      if(!levels.by('code', match)) {
-        levels.insert({
-          code: match,
-          author: post.poster,
-          firstPost: post.postNumber
-        })
-      };
-    });
-  });
-
-  db.saveDatabase();
-  console.log('done building levels collection');
-
-  console.log(`${levels.data.length} levels created`);
-}
-
-let buildCommunityShowcaseColumn = function() {
-	let posts = db.getCollection('posts');
-	let results = posts.find({'$and' : [
-		{body: {'$contains': 'http://i.imgur.com/kAlmwzR.png'}},
-		{poster: 'daydream'}
-	]});
-
-	if(!results) return;
-	console.log(`${results.length} community showcase posts found`);
-	results.forEach(post => {
-		post.isCommunityShowcase = true;
-		posts.update(post);
-	})
-	
-	db.saveDatabase();
-	console.log('completed building isCommunityShowcase column');
-
-}
-
-let buildLevelsMentionedColumn = function() {
-  let posts = db.getCollection('posts');
-
-  posts.data.forEach(post => {
-    let matches = post.body.match(/\w{4}-\w{4}-\w{4}-\w{4}/g);
-    post.levelsMentioned = matches;
-    posts.update(post);
-  })
-
-  db.saveDatabase();
-  console.log('completed building levelsMentioned column');
-}
-
-let buildMentionsOtherColumn = function() {
-  let posts = db.getCollection('posts'),
-    levels = db.getCollection('levels');
-
-  posts.data.forEach(post => {
-    post.levelsMentioned.forEach(levelMentioned => {
-      let level = levels.by('code', levelMentioned);
-      if(level.author != post.poster) {
-        post.mentionsOther = true;
-      }
-    });
-  });
-  db.saveDatabase();
-  console.log('completed building mentionsOther column');
-}
-
-
-/*
-  thread {
-    threadId
-    isOt
-    nothingToRefresh
+        count++
+        if(post.postCount % notificationLimit == 0) {
+          debug(`${count} records inserted for ${thread.threadId}. last post was ${post.postCount}`)
+          debug('saving database')
+          self.db.saveDatabase()
+        }
+      }).on('end', function() {
+        debug(`done refreshing thread: ${thread.threadId}. ${count} records inserted.`)
+        debug('saving database')
+        self.db.saveDatabase()
+        resolve()
+      })
+    })
   }
 
-	post {
-		postNumber
-		url
-		poster
-    subject
-    time
-    isMod
-    body
+  let applySchema = function(post) {
+    post.friendlyId = `${post.threadId}|${post.postCount}`
 
-    levelsMentioned
-  	isCommunityShowcase
-  	mentionsOther
-	}
+    post.isCommunityShowcase = 
+      post.poster == 'daydream' 
+      && post.body.includes('http://i.imgur.com/kAlmwzR.png') 
+      && self.threads.by('threadId', post.threadId).isOt
 
-	postBody {
-		[{
-			paragraphOrQuote
-			containsCode
-			text
-		}]
-	}
+    //TODO: tokenize body
+    //possible tags include:
+    // b, i, u, strong,     -- these dont matter
+    // br, p,               -- these represent text breaks
+    // blockquote,          -- if not cited, doesn't matter. if cited treat as one entity
+    // img, a               -- these contain an extra step in data mining
+    // li                   -- not sure. maybe text fragment
 
-	user {
-		name
-		isMod
-		reputation
-	}
+    return post
+  }
 
-	level {
-		code
-		author
-		firstPost
-	}
+  let insertPost = function (post) {
+    post = self.posts.insert(post)
 
-	mention {
-		level
-		poster
-		creator
+    //update thread
+    let thread = self.threads.by('threadId', post.threadId)
+    thread.latestPost = post.postCount
+    self.threads.update(thread)
 
-		text  (only if poster != creator)
-		sentiment (only if poster != creator)
-	}
-*/
+    return post
+  }
+
+  let staleFilter = function (thread) {
+    return !thread.finalPost || thread.latestPost < thread.finalPost
+  }
+}
