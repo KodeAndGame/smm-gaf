@@ -2,7 +2,8 @@ let data = require('./lib/data'),
   debug = require('debug')('smm-gaf-app')
 
 let prompt =
-`Super Mario Maker + NeoGAF Recommendation Engine
+`-------------------------------------------------
+Super Mario Maker + NeoGAF Recommendation Engine
 -------------------------------------------------
 
 What would you like to do:
@@ -67,9 +68,6 @@ function dbRefresh() {
     data.db.close();
     console.log(prompt)
     process.stdin.resume()
-  })
-  .catch(function (e) {
-    console.error(e)
   })
 }
 
