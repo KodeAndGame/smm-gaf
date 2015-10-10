@@ -1,11 +1,13 @@
 let fs = require('fs'),
-	loki = require('lokijs'),
+  loki = require('lokijs'),
   Promise = require('bluebird'),
   debug = require('debug')('smm-gaf-data'),
-	gaf = require('./gaf-scraper.js'),
-	dbpath = __dirname + '/../../data/smm-gaf-db.json',
+  gaf = require('./gaf-scraper.js'),
+  postHelper = require('./post-helper'),
+  consts = require('./constants'),
+  dbpath = __dirname + '/../../data/smm-gaf-db.json',
   threadConfigs = require('../../data/threads.json'),
-	db
+  db
 
 module.exports = new Data()
 
@@ -96,6 +98,14 @@ function Data() {
 
   this.reschema = function() {
     return new Promise(function (resolve, reject) {
+      debug('recreating images collection')
+      let images = self.db.addCollection('images')
+      images.ensureUniqueIndex('url')
+
+      debug('recreating links collection')
+      let links = self.db.addCollection('links')
+      links.ensureUniqueIndex('url')
+
       debug('re-applying schema to %s posts', self.posts.data.length)
       let count = 0
       let notificationLimit = 50
@@ -155,20 +165,8 @@ function Data() {
   }
 
   let applySchema = function(post) {
-    post.friendlyId = `${post.threadId}|${post.postCount}`
-
-    post.isCommunityShowcase = 
-      post.poster == 'daydream' 
-      && post.body.includes('http://i.imgur.com/kAlmwzR.png') 
-      && self.threads.by('threadId', post.threadId).isOt
-
-    //TODO: tokenize body
-    //possible tags include:
-    // b, i, u, strong,     -- these dont matter
-    // br, p,               -- these represent text breaks
-    // blockquote,          -- if not cited, doesn't matter. if cited treat as one entity
-    // img, a               -- these contain an extra step in data mining
-    // li                   -- not sure. maybe text fragment
+    post = postHelper.applySchema(post, 
+      self.threads.by('threadId', post.threadId))
 
     return post
   }
@@ -188,3 +186,15 @@ function Data() {
     return !thread.finalPost || thread.latestPost < thread.finalPost
   }
 }
+
+    //TODO: tokenize body
+    //possible tags include:
+    // b, i, u, strong,     -- these dont matter
+    // br, p,               -- these represent text breaks
+    // blockquote,          -- if not cited, doesn't matter. if cited treat as one entity
+    // img, a               -- these contain an extra step in data mining
+    // li                   -- not sure. maybe text fragment
+
+    // remove unnecessary tags
+    //let body = post.body
+    //  .replace(/<\/?(?!br|p|blockquote|a|img|li|ul)[\w\s]+>/g, '')
