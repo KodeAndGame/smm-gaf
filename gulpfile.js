@@ -17,6 +17,14 @@ gulp.task('enable-log', function() {
   })
 });
 
+gulp.task('disable-log', function() {
+  env({
+    vars: {
+      DEBUG: ''
+    }
+  })
+});
+
 gulp.task('build', function () {
   return gulp.src("src/**/**.js")
     .pipe(babel({stage : 0}))
